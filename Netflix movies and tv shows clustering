@@ -1,0 +1,1058 @@
+# Import Libraries
+## Data Maipulation Libraries
+import numpy as np
+import pandas as pd
+import datetime as dt
+
+## Data Visualisation Libraray
+import matplotlib.pyplot as plt
+from wordcloud import WordCloud, STOPWORDS
+import seaborn as sns
+# %matplotlib inline
+import plotly.graph_objects as go
+
+
+# libraries used to process textual data
+import string
+string.punctuation
+import nltk
+nltk.download('punkt')
+import re
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+from nltk.tokenize import TweetTokenizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+# libraries used to implement clusters
+from sklearn.metrics import silhouette_score
+from yellowbrick.cluster import SilhouetteVisualizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import KMeans
+from scipy.cluster.hierarchy import dendrogram
+
+# Library of warnings would assist in ignoring warnings issued
+import warnings;warnings.filterwarnings('ignore')
+import warnings;warnings.simplefilter('ignore')
+
+
+# Mounting drive
+# from google.colab import drive
+# drive.mount('/content/drive')
+
+# Load Dataset
+df=pd.read_csv(r"C:\Users\saswa\OneDrive\Documents\pandas data\data\ML_data\capstones\4 unsupervised learning\Netflix sentiment and clustering\NETFLIX MOVIES AND TV SHOWS CLUSTERING.csv")
+
+# Dataset First Look
+df.head()
+
+# Dataset Rows & Columns count
+print(f"Rows and Column count in the Dataset: Rows= {df.shape[0]}, Columns= {df.shape[1]}")
+
+# Dataset Info
+df.info()
+
+# Dataset Duplicate Value Count
+print(f"The total number of duplicated observations in the dataset: {df.duplicated().sum()}")
+
+# Missing Values/Null Values Count
+print("-"*50)
+print("Null value count in each of the variable: ")
+print("-"*50)
+print(df.isna().sum())
+print("-"*50)
+
+# Percentage of null values in each category
+print("Percentage of null values in each variable: ")
+print("-"*50)
+null_count_by_variable = df.isnull().sum()/len(df)
+print(f"{null_count_by_variable*100}%")
+print("-"*50)
+
+# Visualizing the missing values
+# Checking Null Value by plotting Heatmap
+plt.figure(figsize=(7,5))
+sns.heatmap(df.isnull(), cbar=True)
+plt.show()
+
+# Visualizing the missing values
+plt.figure(figsize=(15,8))
+plots= sns.barplot(x=df.columns,y=df.isna().sum())
+plt.grid(linestyle='--', linewidth=0.3)
+
+
+
+for bar in plots.patches:
+      plots.annotate(bar.get_height(),
+                     (bar.get_x() + bar.get_width() / 2,
+                      bar.get_height()), ha='center', va='center',
+                     size=12, xytext=(0, 8),
+                     textcoords='offset points')
+# plt.show()
+
+
+
+# Dataset Columns
+print(f"Available columns:\n{df.columns.to_list()}")
+
+
+# Check Unique Values for each variable.
+print(f"The number of unique values in: ")
+print("-"*35)
+for i in df.columns:
+  print(f"'{i}' : {df[i].nunique()}")
+
+
+
+
+
+# Data Wrangling
+# Missing Values/Null Values Count
+print("-"*50)
+print("Null value count in each of the variable: ")
+print("-"*50)
+print(df.isna().sum())
+print("-"*50)
+
+# Let's find out the percentage of null values in each category in order to deal with it.
+print("Percentage of null values in each variable: ")
+print("-"*50)
+null_count_by_variable = df.isnull().sum()/len(df)
+print(f"{null_count_by_variable*100}%")
+print("-"*50)
+
+df["date_added"].value_counts()
+
+df['rating'].value_counts()
+
+df['country'].value_counts()
+
+## Imputing null value as per our discussion
+# imputing with unknown in null values of director and cast feature
+df[['director','cast']]=df[['director','cast']].fillna("Unknown")
+
+# Imputing null values of country with Mode
+df['country']=df['country'].fillna(df['country'].mode()[0])
+
+# Dropping remaining null values of date_added and rating
+df.dropna(axis=0, inplace=True)
+
+# Rechecking the Missing Values/Null Values Count
+print("-"*50)
+print("Null value count in each of the variable: ")
+print("-"*50)
+print(df.isna().sum())
+print("-"*50)
+
+# Rechecking the percentage of null values in each category
+print("Percentage of null values in each variable: ")
+print("-"*50)
+null_count_by_variable = df.isnull().sum()/len(df)
+print(f"{null_count_by_variable*100}%")
+print("-"*50)
+
+# Let's create a copy of dataframe and unnest the original one
+df_new= df.copy()
+
+# Unnesting 'Directors' column
+dir_constraint=df['director'].apply(lambda x: str(x).split(', ')).tolist()
+df1 = pd.DataFrame(dir_constraint, index = df['title'])
+df1 = df1.stack()
+df1 = pd.DataFrame(df1.reset_index())
+df1.rename(columns={0:'Directors'},inplace=True)
+df1 = df1.drop(['level_1'],axis=1)
+df1.sample(10)
+
+# Unnesting 'cast' column
+cast_constraint=df['cast'].apply(lambda x: str(x).split(', ')).tolist()
+df2 = pd.DataFrame(cast_constraint, index = df['title'])
+df2 = df2.stack()
+df2 = pd.DataFrame(df2.reset_index())
+df2.rename(columns={0:'Actors'},inplace=True)
+df2 = df2.drop(['level_1'],axis=1)
+df2.sample(10)
+
+# Unnesting 'listed_in' column
+listed_constraint=df['listed_in'].apply(lambda x: str(x).split(', ')).tolist()
+df3 = pd.DataFrame(listed_constraint, index = df['title'])
+df3 = df3.stack()
+df3 = pd.DataFrame(df3.reset_index())
+df3.rename(columns={0:'Genre'},inplace=True)
+df3 = df3.drop(['level_1'],axis=1)
+df3.sample(10)
+
+# Unnesting 'country' column
+country_constraint=df['country'].apply(lambda x: str(x).split(', ')).tolist()
+df4 = pd.DataFrame(country_constraint, index = df['title'])
+df4 = df4.stack()
+df4 = pd.DataFrame(df4.reset_index())
+df4.rename(columns={0:'Country'},inplace=True)
+df4 = df4.drop(['level_1'],axis=1)
+df4.sample(10)
+
+
+
+## Merging all the unnested dataframes
+# Merging director and cast
+df5 = df2.merge(df1,on=['title'],how='inner')
+
+# Merging listed_in with merged of (director and cast)
+df6 = df5.merge(df3,on=['title'],how='inner')
+
+# Merging country with merged of [listed_in with merged of (director and cast)]
+df7 = df6.merge(df4,on=['title'],how='inner')
+
+# Head of final merged dataframe
+df7.head()
+
+# Merging unnested data with the created dataframe in order to make the final dataframe
+df = df7.merge(df[['type', 'title', 'date_added', 'release_year', 'rating', 'duration','description']],on=['title'],how='left')
+df.head()
+
+
+# Checking info of the dataset before typecasting
+df.info()
+
+# Typecasting duration into integer by removing 'min' and 'season' from the end
+df['duration']= df['duration'].apply(lambda x: int(x.split()[0]))
+
+# Typecasting string object to datetime object of date_added column
+df['date_added']= pd.to_datetime(df['date_added'])
+
+# Extracting date, day, month and year from date_added column
+df["day_added"]= df["date_added"].dt.day
+df["month_added"]= df["date_added"].dt.month
+df["year_added"]= df["date_added"].dt.year
+
+# Dropping date_added
+df.drop('date_added', axis=1, inplace=True)
+
+# Checking info of the dataset after typecasting
+df.info()
+
+# Binning the values in the rating column
+rating_map = {'TV-MA':'Adult Content',
+              'R':'Adult Content',
+              'PG-13':'Teen Content',
+              'TV-14':'Teen Content',
+              'TV-PG':'Children Content',
+              'NR':'Not Rated',
+              'TV-G':'Children Content',
+              'TV-Y':'Family-friendly Content',
+              'TV-Y7':'Family-friendly Content',
+              'PG':'Children Content',
+              'G':'Children Content',
+              'NC-17':'Adult Content',
+              'TV-Y7-FV':'Family-friendly Content',
+              'UR':'Not Rated'}
+
+df['rating'].replace(rating_map, inplace = True)
+df['rating'].unique()
+
+# Checking head after binning
+df.head()
+
+# Spearating the dataframes for further analysis
+df_movies= df[df['type']== 'Movie']
+df_tvshows= df[df['type']== 'TV Show']
+
+# Printing the shape
+print(df_movies.shape, df_tvshows.shape)
+
+# Chart - 1 visualization code
+
+labels = ['TV Show', 'Movie']
+values = [df.type.value_counts()[1], df.type.value_counts()[0]]
+
+# Colors
+colors = ['#ffd700', '#008000']
+
+# Create pie chart
+fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.6)])
+
+# Customize layout
+fig.update_layout(
+    title_text='Type of Content Watched on Netflix',
+    title_x=0.5,
+    height=500,
+    width=500,
+    legend=dict(x=0.9),
+    annotations=[dict(text='Type of Content', font_size=20, showarrow=False)]
+)
+
+# Set colors
+fig.update_traces(marker=dict(colors=colors))
+
+
+# Chart - 2 How content is distributed over Netflix?
+plt.figure(figsize=(25,10))
+for i,j,k in ((df, 'Overall',0),(df_movies, 'Movies',1),(df_tvshows, 'TV Shows',2)):
+  plt.subplot(1,3,k+1)
+  count= i['rating'].value_counts()
+  plt.pie(count, labels=count.index,explode=(0,0,0,0,0.5),colors=['orangered','dodgerblue','lightgreen','mediumslateblue','yellow'],
+          autopct='%1.1f%%', labeldistance=1.1,wedgeprops={"edgecolor" : "black",'linewidth': 1,'antialiased': True})
+  plt.title(f"Distribution of Content Rating on Netflix '{j}'")
+  plt.axis('equal')
+# plt.show()
+
+# Top 10 casts in Movies and TV Shows
+plt.style.use('default')
+plt.figure(figsize=(23,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_actor = i.groupby(['Actors']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[1:10]
+  plots= sns.barplot(y = "Actors",x = 'title', data = df_actor, palette='Set1')
+  plt.title(f'Actors appeared in most of the {j}')
+  plt.grid(linestyle='--', linewidth=0.3)
+  plots.bar_label(plots.containers[0])
+# plt.show()
+
+# Top 10 Directors in Movies and TV Shows
+plt.figure(figsize=(23,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_director = i.groupby(['Directors']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[1:10]
+  plots= sns.barplot(y = "Directors",x = 'title', data = df_director, palette='Paired')
+  plt.title(f'Directors appeared in most of the {j}')
+  plt.grid(linestyle='--', linewidth=0.3)
+  plots.bar_label(plots.containers[0])
+# plt.show()
+
+# top ten countries invloved in content creation
+df_country = df.groupby(['Country']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[:10]
+plt.figure(figsize=(15,6))
+plots= sns.barplot(y = "Country",x = 'title', data = df_country)
+plt.xticks(rotation = 60)
+plt.title('Top 10 Countries for content creation')
+plt.grid(linestyle='--', linewidth=0.3)
+plots.bar_label(plots.containers[0])
+# plt.show()
+
+#Analysing top15 countries with most content
+plt.figure(figsize=(18,5))
+plt.grid(linestyle='--', linewidth=0.3)
+sns.countplot(x=df['Country'],order=df['Country'].value_counts().index[0:15],hue=df['type'],palette ="Set1")
+plt.xticks(rotation=50)
+plt.title('Top 15 countries with most contents', fontsize=15, fontweight='bold')
+# plt.show()
+
+plt.figure(figsize=(20,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_country = i.groupby(['Country']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[:10]
+  plots= sns.barplot(y = "Country",x = 'title', data = df_country, palette='Set1')
+  plt.title(f'Top 10 countries launching {j} back to back')
+  plt.grid(linestyle='--', linewidth=0.3)
+  plots.bar_label(plots.containers[0])
+# plt.show()
+
+# which countries have highest spread over tv shows and movies over netflix
+plt.figure(figsize=(23,8))
+df_genre = df.groupby(['Genre']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[:10]
+plots= sns.barplot(y = "Genre",x = 'title', data = df_genre)
+plt.title(f'Most popular genre on Netflix')
+plt.grid(linestyle='--', linewidth=0.3)
+plots.bar_label(plots.containers[0])
+# plt.show()
+
+# which genres are popular on netflix
+plt.figure(figsize=(23,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_genre = i.groupby(['Genre']).agg({'title':'nunique'}).reset_index().sort_values(by=['title'],ascending=False)[:10]
+  plots= sns.barplot(y = "Genre",x = 'title', data = df_genre, palette='Set1')
+  plt.title(f'Most popular genre of the {j}')
+  plt.grid(linestyle='--', linewidth=0.3)
+  plots.bar_label(plots.containers[0])
+  plt.yticks(rotation = 45)
+# plt.show()
+
+# total number of tv shows are aded on netflix per year
+plt.figure(figsize=(20,6))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_release_year = i.groupby(['release_year']).agg({'title':'nunique'}).reset_index().sort_values(by=['release_year'],ascending=False)[:14]
+  plots= sns.barplot(x = 'release_year',y= 'title', data = df_release_year, palette='husl')
+  plt.title(f'{j} released by year')
+  plt.ylabel(f"Number of {j} released")
+  plt.grid(linestyle='--', linewidth=0.3)
+
+  for bar in plots.patches:
+     plots.annotate(bar.get_height(),
+                    (bar.get_x() + bar.get_width() / 2,
+                     bar.get_height()), ha='center', va='center',
+                    size=12, xytext=(0, 8),
+                    textcoords='offset points')
+# plt.show()
+
+plt.figure(figsize=(20,6))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_country = i.groupby(['year_added']).agg({'title':'nunique'}).reset_index().sort_values(by=['year_added'],ascending=False)
+  plots= sns.barplot(x = 'year_added',y= 'title', data = df_country, palette='husl')
+  plt.title(f'{j} added to Netflix by year')
+  plt.ylabel(f"Number of {j} added on Netflix")
+  plt.grid(linestyle='--', linewidth=0.3)
+
+  for bar in plots.patches:
+     plots.annotate(bar.get_height(),
+                    (bar.get_x() + bar.get_width() / 2,
+                     bar.get_height()), ha='center', va='center',
+                    size=12, xytext=(0, 8),
+                    textcoords='offset points')
+# plt.show()
+
+# total number of tv shows are aded on netflix per month
+plt.figure(figsize=(23,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_month = i.groupby(['month_added']).agg({'title':'nunique'}).reset_index().sort_values(by=['month_added'],ascending=False)
+  plots= sns.barplot(x = 'month_added',y='title', data = df_month, palette='husl')
+  plt.title(f'{j} added added to Netflix by month')
+  plt.ylabel(f"Number of {j} added on Netflix")
+  plt.grid(linestyle='--', linewidth=0.3)
+  for bar in plots.patches:
+     plots.annotate(bar.get_height(),
+                    (bar.get_x() + bar.get_width() / 2,
+                     bar.get_height()), ha='center', va='center',
+                    size=12, xytext=(0, 8),
+                    textcoords='offset points')
+# plt.show()
+
+# total number of tv shows are aded on netflix per day
+
+plt.figure(figsize=(23,8))
+for i,j,k in ((df_movies, 'Movies',0),(df_tvshows, 'TV Shows',1)):
+  plt.subplot(1,2,k+1)
+  df_day = i.groupby(['day_added']).agg({'title':'nunique'}).reset_index().sort_values(by=['day_added'],ascending=False)
+  plots= sns.barplot(x = 'day_added',y='title', data = df_day, palette='husl')
+  plt.title(f'{j} added added to Netflix by day')
+  plt.ylabel(f"Number of {j} added on Netflix")
+  plt.grid(linestyle='--', linewidth=0.3)
+  for bar in plots.patches:
+     plots.annotate(bar.get_height(),
+                    (bar.get_x() + bar.get_width() / 2,
+                     bar.get_height()), ha='center', va='bottom',
+                    size=12, xytext=(0, 8),
+                    textcoords='offset points', rotation=90)
+# plt.show()
+
+# what is the month wise added content by in each year on netflix
+plt.figure(figsize=(20,8))
+df_year_month = df.groupby(['year_added','month_added']).agg({'title':'nunique'}).reset_index().sort_values(by=['year_added'],ascending=False)
+sns.lineplot(x = 'year_added',y='title', data = df_year_month, palette = 'hls', hue=df_year_month['month_added'], marker='o')
+plt.grid(linestyle='--', linewidth=0.3)
+# plt.show()
+
+# what is the day wise added content by in each year on netflix
+
+plt.figure(figsize=(20,8))
+df_year_month = df.groupby(['year_added','day_added']).agg({'title':'nunique'}).reset_index().sort_values(by=['year_added'],ascending=False)
+sns.lineplot(x = 'year_added',y='title', data = df_year_month, palette = 'hls', hue=df_year_month['day_added'], marker='o')
+plt.grid(linestyle='--', linewidth=0.3)
+# plt.show()
+
+# what is the distribuion of duration of contents on netflix
+#Checking the distribution of Movie Durations
+plt.figure(figsize=(10,7))
+plots= sns.distplot(df_movies['duration'],kde=False, color=['green'])
+plt.title('Distplot with Normal distribution for Movies',fontweight="bold")
+for bar in plots.patches:
+   plots.annotate(bar.get_height(),
+                  (bar.get_x() + bar.get_width() / 2,
+                   bar.get_height()), ha='center', va='bottom',
+                  size=7, xytext=(0, 5),
+                  textcoords='offset points', rotation=90)
+# plt.show()
+
+plt.figure(figsize=(23,8))
+df_duration = df_tvshows.groupby(['duration']).agg({'title':'nunique'}).reset_index().sort_values(by=['duration'],ascending=False)
+plots= sns.barplot(x = 'duration',y='title', data = df_duration, palette='husl')
+plt.title(f'Barplot of TV Shows Duration')
+plt.ylabel(f"Content count")
+plt.grid(linestyle='--', linewidth=0.3)
+for bar in plots.patches:
+   plots.annotate(bar.get_height(),
+                  (bar.get_x() + bar.get_width() / 2,
+                   bar.get_height()), ha='center', va='bottom',
+                  size=12, xytext=(0, 8),
+                  textcoords='offset points', rotation=90)
+# plt.show()
+
+#Chart - 14 - What is the Distribution of Content Rating in each highest content creating countries?
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df['count'] = 1
+data = df.groupby('Country')[['Country', 'count']].sum().sort_values(by='count', ascending=False).reset_index()[:10]
+data = data['Country']
+df_heatmap = df.loc[df['Country'].isin(data)]
+df_heatmap = pd.crosstab(df_heatmap['Country'], df_heatmap['rating'], normalize="index").T
+
+# Plotting the heatmap
+fig, ax = plt.subplots(1, 1, figsize=(10, 8))
+
+# Defining order of representation
+country_order = ['United States', 'India', 'United Kingdom', 'Canada', 'France', 'Japan', 'Spain', 'South Korea', 'Germany', 'Mexico']
+rating_order = ['Adult Content', 'Teen Content', 'Children Content', 'Family-friendly Content', 'Not Rated']
+
+# Calling and plotting heatmap
+sns.heatmap(df_heatmap.loc[rating_order, country_order], cmap="jet", square=True, linewidth=2.5, cbar=False, annot=True, fmt='1.0%',
+            vmax=.6, vmin=0.05, ax=ax, annot_kws={"fontsize": 12})
+# plt.show()
+
+
+# HYPOTHETICAL STATEMENT 1
+# Perform Statistical Test to obtain P-Value
+from statsmodels.stats.proportion import proportions_ztest  #------> This function is used to perform z test of proportion.
+
+# Subset the data to only include drama and comedy movies
+subset = df[df['Genre'].str.contains('Dramas') | df['Genre'].str.contains('Comedies')]
+
+# Calculate the proportion of drama and comedy movies
+drama_prop = len(subset[subset['Genre'].str.contains('Dramas')]) / len(subset)
+comedy_prop = len(subset[subset['Genre'].str.contains('Comedies')]) / len(subset)
+
+# Set up the parameters for the z-test
+count = [int(drama_prop * len(subset)), int(comedy_prop * len(subset))]
+nobs = [len(subset), len(subset)]
+alternative = 'two-sided'
+
+# Perform the z-test
+z_stat, p_value = proportions_ztest(count=count, nobs=nobs, alternative=alternative)
+print('z-statistic: ', z_stat)
+print('p-value: ', p_value)
+
+# Set the significance level
+alpha = 0.05
+
+# Print the results of the z-test
+if p_value < alpha:
+    print(f"Reject the null hypothesis.")
+else:
+    print(f"Fail to reject the null hypothesis.")
+
+# Perform Statistical Test to obtain P-Value
+# To test this hypothesis, we perform a two-sample t-test.
+from scipy.stats import ttest_ind
+
+# Create separate dataframes for TV shows in 2020 and 2021
+tv_2020 = df[(df['type'] == 'TV Show') & (df['release_year'] == 2020)]
+tv_2021 = df[(df['type'] == 'TV Show') & (df['release_year'] == 2021)]
+
+# Perform two-sample t-test
+t, p = ttest_ind(tv_2020['duration'].astype(int),
+                 tv_2021['duration'].astype(int), equal_var=False)
+print('t-value: ', t)
+print('p-value: ', p)
+
+# Print the results
+if p < 0.05:
+    print('Reject null hypothesis. \nThe average duration of TV shows added in the year 2020 on Netflix is significantly different from the average duration of TV shows added in the year 2021.')
+else:
+    print('Failed to reject null hypothesis. \nThe average duration of TV shows added in the year 2020 on Netflix is not significantly different from the average duration of TV shows added in the year 2021.')
+
+
+# Perform Statistical Test to obtain P-Value
+from statsmodels.stats.proportion import proportions_ztest  #------> This function is used to perform z test of proportion.
+
+# Calculate the proportion of drama and comedy movies
+tv_proportion = np.sum(df_tvshows['Country'].str.contains('United States')) / len(df_tvshows)
+movie_proportion = np.sum(df_movies['Country'].str.contains('United States')) / len(df_movies)
+
+# Set up the parameters for the z-test
+count = [int(tv_proportion * len(df_tvshows)), int(movie_proportion * len(df_movies))]
+nobs = [len(df_tvshows), len(df_movies)]
+alternative = 'two-sided'
+
+# Perform the z-test
+z_stat, p_value = proportions_ztest(count=count, nobs=nobs, alternative=alternative)
+print('z-statistic: ', z_stat)
+print('p-value: ', p_value)
+
+# Set the significance level
+alpha = 0.05
+
+# Print the results of the z-test
+if p_value < alpha:
+    print(f"Reject the null hypothesis.")
+else:
+    print(f"Fail to reject the null hypothesis.")
+
+
+# Handling Missing Values & Missing Value Imputation
+# Since we have already dealed with null value. So it is not needed now.
+df.isna().sum()
+
+
+# Storing the continous value feature in a separate list
+continous_value_feature= ["release_year","duration","day_added","month_added","year_added"]
+
+# checking outliers with the help of box plot for continous features
+plt.figure(figsize=(16,5))
+for n,column in enumerate(continous_value_feature):
+  plt.subplot(1, 5, n+1)
+  sns.boxplot(df[column])
+  plt.title(f'{column.title()}',weight='bold')
+  plt.tight_layout()
+
+  # Here we are taking the copied dataframe as the data having more number of observations resulted in ram exhaustion.
+  df.shape, df_new.shape
+
+  # Binning of rating in new dataframe
+  df_new['rating'].replace(rating_map, inplace=True)
+
+  # Checking sample after binning
+  df_new.sample(2)
+
+  # Creating new feature content_detail with the help of other textual attributes
+  df_new["content_detail"] = df_new["cast"] + " " + df_new["director"] + " " + df_new["listed_in"] + " " + df_new[
+      "type"] + " " + df_new["rating"] + " " + df_new["country"] + " " + df_new["description"]
+
+  # checking the manipulation
+  df_new.head(5)
+
+  # Lower Casing
+  df_new['content_detail'] = df_new['content_detail'].str.lower()
+
+  # Checking the manipulation
+  df_new.iloc[281,]['content_detail']
+
+
+  # function to remove punctuations
+  def remove_punctuations(text):
+      '''This function is used to remove the punctuations from the given sentence'''
+      # imorting needed library
+      import string
+      # replacing the punctuations with no space, which in effect deletes the punctuation marks.
+      translator = str.maketrans('', '', string.punctuation)
+      # return the text stripped off punctuation marks
+      return text.translate(translator)
+
+
+  # Removing Punctuations from the content_detail
+  df_new['content_detail'] = df_new['content_detail'].apply(remove_punctuations)
+
+  # Checking the observation after manipulation
+  df_new.iloc[281,]['content_detail']
+
+
+  def remove_url_and_numbers(text):
+      '''This function is used to remove the URL's and Numbers from the given sentence'''
+      # importing needed libraries
+      import re
+      import string
+
+      # Replacing the URL's with no space
+      url_number_pattern = re.compile(r'https?://\S+|www\.\S+')
+      text = re.sub(url_number_pattern, '', text)
+
+      # Replacing the digits with one space
+      text = re.sub('[^a-zA-Z]', ' ', text)
+
+      # return the text stripped off URL's and Numbers
+      return text
+
+
+  # Remove URLs & Remove words and digits contain digits
+  df_new['content_detail'] = df_new['content_detail'].apply(remove_url_and_numbers)
+
+  # Checking the observation after manipulation
+  df_new.iloc[281,]['content_detail']
+
+
+  # removing stopwords and whitespaces
+  # Downloading stopwords
+  nltk.download('stopwords')
+
+  # create a set of English stop words
+  stop_words = stopwords.words('english')
+
+  # displaying stopwords
+  print(stop_words)
+
+
+  def remove_stopwords_and_whitespaces(text):
+      '''This function is used for removing the stopwords from the given sentence'''
+      text = [word for word in text.split() if not word in stopwords.words('english')]
+
+      # joining the list of words with space separator
+      text = " ".join(text)
+
+      # removing whitespace
+      text = re.sub(r'\s+', ' ', text)
+
+      # return the manipulated string
+      return text
+
+
+  # Remove URLs & Remove words and digits contain digits
+  df_new['content_detail'] = df_new['content_detail'].apply(remove_stopwords_and_whitespaces)
+
+  # Checking the observation after manipulation
+  df_new.iloc[281,]['content_detail']
+
+  df_new['content_detail'][0]
+
+
+  # tokenization
+
+  # Downloading needed libraries
+  nltk.download('punkt')
+
+  # Tokenization
+  df_new['content_detail'] = df_new['content_detail'].apply(nltk.word_tokenize)
+
+  # Checking the observation after manipulation
+  df_new.iloc[281,]['content_detail']
+
+  # Normalizing Text (i.e., Stemming, Lemmatization etc.)
+  # Importing WordNetLemmatizer from nltk module
+  from nltk.stem import WordNetLemmatizer
+
+  # Creating instance for wordnet
+  wordnet = WordNetLemmatizer()
+
+
+  def lemmatizing_sentence(text):
+      '''This function is used for lemmatizing (changing the given word into meaningfull word) the words from the given sentence'''
+      text = [wordnet.lemmatize(word) for word in text]
+
+      # joining the list of words with space separator
+      text = " ".join(text)
+
+      # return the manipulated string
+      return text
+
+
+  # Downloading needed libraries
+  nltk.download('averaged_perceptron_tagger')
+  nltk.download('wordnet')
+
+  # Rephrasing text by applying defined lemmatizing function
+  df_new['content_detail'] = df_new['content_detail'].apply(lemmatizing_sentence)
+
+  # Checking the observation after manipulation
+  df_new.iloc[281,]['content_detail']
+
+
+  # Part of speech tagging
+
+  # tokenize the text into words before POS Taging
+  df_new['pos_tags'] = df_new['content_detail'].apply(nltk.word_tokenize).apply(nltk.pos_tag)
+
+  # Checking the observation after manipulation
+  df_new.head(5)
+
+
+# text vectorization
+  # Vectorizing Text
+  # Importing needed libraries
+  from sklearn.feature_extraction.text import TfidfVectorizer
+
+  # Creating instance
+  tfidfv = TfidfVectorizer(max_features=30000)  # Setting max features as 30000 to avoid RAM explosion
+
+  # Fitting on TfidfVectorizer
+  x = tfidfv.fit_transform(df_new['content_detail'])
+
+  # Checking shape of the formed document matrix
+  print(x.shape)
+
+
+  # dimensionality reduction
+
+# Dimensionality Reduction
+# Importing PCA from sklearn
+from sklearn.decomposition import PCA
+
+# Defining PCA object with desired number of components
+pca = PCA()
+
+# Fitting the PCA model
+pca.fit(x.toarray())
+
+# percent of variance captured by each component
+variance = pca.explained_variance_ratio_
+print(f"Explained variance: {variance}")
+
+# Ploting the percent of variance captured versus the number of components in order to determine the reduced dimensions
+fig, ax = plt.subplots()
+ax.plot(range(1, len(variance)+1), np.cumsum(pca.explained_variance_ratio_))
+ax.set_xlabel('Number of Components')
+ax.set_ylabel('Percent of Variance Captured')
+ax.set_title('PCA Analysis')
+plt.grid(linestyle='--', linewidth=0.3)
+plt.show()
+
+
+## Now we are passing the argument so that we can capture 95% of variance.
+# Defining instance
+pca_tuned = PCA(n_components=0.95)
+
+# Fitting and transforming the model
+pca_tuned.fit(x.toarray())
+x_transformed = pca_tuned.transform(x.toarray())
+
+# Checking the shape of transformed matrix
+print(x_transformed.shape)
+
+
+
+
+# ML model implimentation
+## Determining optimal value of K using KElbowVisualizer
+# Importing needed library
+from sklearn.cluster import KMeans
+from yellowbrick.cluster import KElbowVisualizer
+
+# Instantiate the clustering model and visualizer
+model = KMeans(random_state=0)
+visualizer = KElbowVisualizer(model, k=(1,16),locate_elbow=False)
+
+# Fit the data to the visualizer
+visualizer.fit(x_transformed)
+
+# Finalize and render the figure
+visualizer.show()
+
+## Determining optimal value of K using KElbowVisualizer
+# Importing needed library
+from sklearn.cluster import KMeans
+from yellowbrick.cluster import KElbowVisualizer
+
+# Instantiate the clustering model and visualizer
+visualizer = KElbowVisualizer(model, k=(2,16), metric='silhouette', timings=True, locate_elbow=False)
+
+# Fit the data to the visualizer
+visualizer.fit(x_transformed)
+
+# Finalize and render the figure
+visualizer.show()
+
+## Computing Silhouette score for each k
+# Importing needed libraries
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+# Defining Range
+k_range = range(2, 7)
+for k in k_range:
+    Kmodel = KMeans(n_clusters=k)
+    labels = Kmodel.fit_predict(x_transformed)
+    score = silhouette_score(x, labels)
+    print("k=%d, Silhouette score=%f" % (k, score))
+
+
+#training the K-means model on a dataset
+kmeans = KMeans(n_clusters=4, init='k-means++', random_state= 0)
+
+#predict the labels of clusters.
+plt.figure(figsize=(10,6), dpi=120)
+label = kmeans.fit_predict(x_transformed)
+#Getting unique labels
+unique_labels = np.unique(label)
+
+#plotting the results:
+for i in unique_labels:
+    plt.scatter(x_transformed[label == i , 0] , x_transformed[label == i , 1] , label = i)
+plt.legend()
+plt.show()
+
+# Importing library to visualize clusters in 3D
+from mpl_toolkits.mplot3d import Axes3D
+
+# Plot the clusters in 3D
+fig = plt.figure(figsize=(20,8))
+ax = fig.add_subplot(111, projection='3d')
+colors = ['r', 'g', 'b', 'y']
+for i in range(len(colors)):
+    ax.scatter(x_transformed[kmeans.labels_ == i, 2], x_transformed[kmeans.labels_ == i, 0], x_transformed[kmeans.labels_ == i, 1], c=colors[i])
+
+# Rotate the plot 30 degrees around the X axis and 45 degrees around the Z axis
+ax.view_init(elev=20, azim=-120)
+ax.set_xlabel('x-axis')
+ax.set_ylabel('y-axis')
+ax.set_zlabel('z-axis')
+plt.show()
+
+# Add cluster values to the dateframe.
+df_new['kmeans_cluster'] = kmeans.labels_
+
+
+# modelplanation using its performance
+def kmeans_wordcloud(cluster_number, column_name):
+    '''function for Building a wordcloud for the movie/shows'''
+
+    #Importing libraries
+    from wordcloud import WordCloud, STOPWORDS
+
+    # Filter the data by the specified cluster number and column name
+    df_wordcloud = df_new[['kmeans_cluster', column_name]].dropna()
+    df_wordcloud = df_wordcloud[df_wordcloud['kmeans_cluster'] == cluster_number]
+    df_wordcloud = df_wordcloud[df_wordcloud[column_name].str.len() > 0]
+
+    # Combine all text documents into a single string
+    text = " ".join(word for word in df_wordcloud[column_name])
+
+    # Create the word cloud
+    wordcloud = WordCloud(stopwords=set(STOPWORDS), background_color="black").generate(text)
+
+    # Convert the wordcloud to a numpy array
+    image_array = wordcloud.to_array()
+
+    # Return the numpy array
+    return image_array
+
+# Implementing the above defined function and plotting the wordcloud of each attribute
+fig, axs = plt.subplots(nrows=4, ncols=4, figsize=(20, 15))
+for i in range(4):
+    for j, col in enumerate(['description', 'listed_in', 'country', 'title']):
+        axs[j][i].imshow(kmeans_wordcloud(i, col))
+        axs[j][i].axis('off')
+        axs[j][i].set_title(f'Cluster {i}, {col}',fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+
+# ml 2 - hierarchical clustering
+#importing needed libraries
+from scipy.cluster.hierarchy import linkage, dendrogram
+
+# HIERARCHICAL CLUSTERING
+distances_linkage = linkage(x_transformed, method = 'ward', metric = 'euclidean')
+plt.figure(figsize=(25, 10))
+plt.title('Hierarchical Clustering Dendrogram')
+plt.xlabel('All films/TV shows')
+plt.ylabel('Euclidean Distance')
+
+dendrogram(distances_linkage, no_labels = True)
+plt.show()
+
+## Computing Silhouette score for each k
+# Importing needed libraries
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import silhouette_score
+
+# Range selected from dendrogram above
+k_range = range(2, 10)
+for k in k_range:
+    model = AgglomerativeClustering(n_clusters=k)
+    labels = model.fit_predict(x_transformed)
+    score = silhouette_score(x, labels)
+    print("k=%d, Silhouette score=%f" % (k, score))
+
+
+#training the K-means model on a dataset
+Agmodel = AgglomerativeClustering(n_clusters = 2, affinity = 'euclidean', linkage = 'ward')
+
+#predict the labels of clusters.
+plt.figure(figsize=(10,6), dpi=120)
+label = Agmodel.fit_predict(x_transformed)
+#Getting unique labels
+unique_labels = np.unique(label)
+
+#plotting the results:
+for i in unique_labels:
+    plt.scatter(x_transformed[label == i , 0] , x_transformed[label == i , 1] , label = i)
+plt.legend()
+plt.show()
+
+# Importing library to visualize clusters in 3D
+from mpl_toolkits.mplot3d import Axes3D
+
+# Plot the clusters in 3D
+fig = plt.figure(figsize=(20,8))
+ax = fig.add_subplot(111, projection='3d')
+colors = ['r', 'g', 'b', 'y']
+for i in range(len(colors)):
+    ax.scatter(x_transformed[Agmodel.labels_ == i, 0], x_transformed[Agmodel.labels_ == i, 1], x_transformed[Agmodel.labels_ == i, 2],c=colors[i])
+ax.set_xlabel('x-axis')
+ax.set_ylabel('y-axis')
+ax.set_zlabel('z-axis')
+plt.show()
+
+
+# Add cluster values to the dateframe.
+df_new['agglomerative_cluster'] = Agmodel.labels_
+
+def agglomerative_wordcloud(cluster_number, column_name):
+  '''function for Building a wordcloud for the movie/shows'''
+
+  #Importing libraries
+  from wordcloud import WordCloud, STOPWORDS
+
+  # Filter the data by the specified cluster number and column name
+  df_wordcloud = df_new[['agglomerative_cluster', column_name]].dropna()
+  df_wordcloud = df_wordcloud[df_wordcloud['agglomerative_cluster'] == cluster_number]
+
+  # Combine all text documents into a single string
+  text = " ".join(word for word in df_wordcloud[column_name])
+
+  # Create the word cloud
+  wordcloud = WordCloud(stopwords=set(STOPWORDS), background_color="black").generate(text)
+
+  # Return the word cloud object
+  return wordcloud
+
+# Implementing the above defined function and plotting the wordcloud of each attribute
+fig, axs = plt.subplots(nrows=4, ncols=2, figsize=(20, 15))
+for i in range(2):
+    for j, col in enumerate(['description', 'listed_in', 'country', 'title']):
+        axs[j][i].imshow(agglomerative_wordcloud(i, col))
+        axs[j][i].axis('off')
+        axs[j][i].set_title(f'Cluster {i}, {col}',fontsize=14, fontweight='bold')
+plt.tight_layout()
+plt.show()
+
+
+# ml3 building a recommendation system
+# Importing neede libraries
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Create a TF-IDF vectorizer object and transform the text data
+tfidf = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf.fit_transform(df_new['content_detail'])
+
+# Compute cosine similarity matrix
+cosine_sim = cosine_similarity(tfidf_matrix)
+
+def recommend_content(title, cosine_sim=cosine_sim, data=df_new):
+    # Get the index of the input title in the programme_list
+    programme_list = data['title'].to_list()
+    index = programme_list.index(title)
+
+    # Create a list of tuples containing the similarity score and index
+    # between the input title and all other programmes in the dataset
+    sim_scores = list(enumerate(cosine_sim[index]))
+
+    # Sort the list of tuples by similarity score in descending order
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:11]
+
+    # Get the recommended movie titles and their similarity scores
+    recommend_index = [i[0] for i in sim_scores]
+    rec_movie = data['title'].iloc[recommend_index]
+    rec_score = [round(i[1], 4) for i in sim_scores]
+
+    # Create a pandas DataFrame to display the recommendations
+    rec_table = pd.DataFrame(list(zip(rec_movie, rec_score)), columns=['Recommendation', 'Similarity_score(0-1)'])
+
+    return rec_table
+
+# Testing indian movie
+recommend_content('Kal Ho Naa Ho')
+
+# Testing non indian movie
+recommend_content('Zombieland')
+
+# Testing indian tv show
+recommend_content('Zindagi Gulzar Hai')
+
+# Testing non indian tv show
+recommend_content('Vampires')
